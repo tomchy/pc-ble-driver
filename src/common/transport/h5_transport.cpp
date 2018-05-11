@@ -229,15 +229,16 @@ uint32_t H5Transport::send(std::vector<uint8_t> &data)
 
         const uint8_t seqNumBefore = seqNum;
 
-        auto status = ackWaitCondition.wait_for(ackGuard, std::chrono::milliseconds(retransmissionInterval));
-
         // Checking for timeout. Also checking against spurios wakeup by making sure the sequence
         // number has  actually increased. If the sequence number has not increased, we have not
         // received an ACK packet, and should not exit the loop (unless timeout).
         // Ref. spurious wakeup:
         // http://en.cppreference.com/w/cpp/thread/condition_variable
         // https://en.wikipedia.org/wiki/Spurious_wakeup
-        if (status == std::cv_status::no_timeout && seqNum != seqNumBefore)
+        if (ackWaitCondition.wait_for(
+            ackGuard,
+            std::chrono::milliseconds(retransmissionInterval),
+            [&] { return seqNum != seqNumBefore; }))
         {
             lastPacket.clear();
             return NRF_SUCCESS;
@@ -245,7 +246,6 @@ uint32_t H5Transport::send(std::vector<uint8_t> &data)
     }
 
     lastPacket.clear();
-
     return NRF_ERROR_TIMEOUT;
 }
 #pragma endregion Public methods
@@ -514,7 +514,7 @@ void H5Transport::setupStateMachine()
             sendControlPacket(CONTROL_PKT_RESET);
             statusCallback(RESET_PERFORMED, "Target Reset performed");
             exit->resetSent = true;
-            syncWaitCondition.wait_for(syncGuard, RESET_WAIT_DURATION);
+            syncWaitCondition.wait_for(syncGuard, RESET_WAIT_DURATION, [&] { return exit->isFullfilled(); });
         }
 
         if (!exit->isFullfilled())
@@ -539,7 +539,7 @@ void H5Transport::setupStateMachine()
         {
             sendControlPacket(CONTROL_PKT_SYNC);
             exit->syncSent = true;
-            syncWaitCondition.wait_for(syncGuard, NON_ACTIVE_STATE_TIMEOUT);
+            syncWaitCondition.wait_for(syncGuard, NON_ACTIVE_STATE_TIMEOUT, [&] { return exit->isFullfilled(); });
             syncRetransmission--;
         }
 
@@ -562,12 +562,17 @@ void H5Transport::setupStateMachine()
         std::unique_lock<std::mutex> syncGuard(syncMutex);
 
         // Send a package immediately
-
         while (!exit->isFullfilled() && syncRetransmission > 0)
         {
             sendControlPacket(CONTROL_PKT_SYNC_CONFIG);
             exit->syncConfigSent = true;
-            syncWaitCondition.wait_for(syncGuard, NON_ACTIVE_STATE_TIMEOUT);
+
+            syncWaitCondition.wait_for(
+                syncGuard,
+                NON_ACTIVE_STATE_TIMEOUT,
+                [&]{ return exit->isFullfilled(); }
+            );
+
             syncRetransmission--;
         }
 
@@ -680,16 +685,7 @@ void H5Transport::stateMachineWorker()
 bool H5Transport::waitForState(h5_state_t state, std::chrono::milliseconds timeout)
 {
     std::unique_lock<std::mutex> lock(stateMutex);
-    stateWaitCondition.wait_for(lock, timeout, [&] { return currentState == state; });
-
-    if (currentState != state)
-    {
-        return false;
-    }
-    else
-    {
-        return true;
-    }
+    return stateWaitCondition.wait_for(lock, timeout, [&] { return currentState == state; });
 }
 
 #pragma endregion State machine related methods

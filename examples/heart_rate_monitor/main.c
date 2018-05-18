@@ -390,9 +390,9 @@ static uint32_t advertising_start()
 #if NRF_SD_BLE_API <= 3
     error_code = sd_ble_gap_adv_start(m_adapter, &adv_params);
 #elif NRF_SD_BLE_API == 5
-    error_code = sd_ble_gap_adv_start(m_adapter, &adv_params, BLE_CONN_CFG_TAG_DEFAULT);
+    error_code = sd_ble_gap_adv_start(m_adapter, &adv_params, m_config_id);
 #elif NRF_SD_BLE_API >= 6
-    error_code = sd_ble_gap_adv_start(m_adapter, m_adv_handle, BLE_CONN_CFG_TAG_DEFAULT);
+    error_code = sd_ble_gap_adv_start(m_adapter, m_adv_handle, m_config_id);
 #endif
 
     if (error_code != NRF_SUCCESS)

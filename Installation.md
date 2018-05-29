@@ -151,7 +151,7 @@ Open a Microsoft Visual Studio Command Prompt and issue the following commands:
 
     > cd %BOOST_ROOT%
     > bootstrap.bat
-    > b2 toolset=msvc-<VV.V> address-model=<32,64> link=static --with-thread --with-system --with-regex --with-date_time --with-chrono
+    > b2 toolset=msvc-<VV.V> address-model=<32,64> link=static --with-thread --with-system --with-regex --with-date_time --with-chrono --with-test
 
 **Note**: If you intend to build a 64-bit version of Boost, you might need to open a 64-bit command prompt such as
 "Visual Studio 2015 x86 x64 Cross Tools Command Prompt" or similar, or run `vcvarsall.bat x86_amd64` or `setenv.cmd" /Release /x64`.
@@ -187,7 +187,7 @@ Open a terminal window and issue the following commands:
 
     $ cd $BOOST_ROOT
     $ ./bootstrap.sh
-    $ ./b2 toolset=gcc cxxflags=-fPIC cflags=-fPIC address-model=<32,64> link=static --with-thread --with-system --with-regex --with-date_time --with-chrono
+    $ ./b2 toolset=gcc cxxflags=-fPIC cflags=-fPIC address-model=<32,64> link=static --with-thread --with-system --with-regex --with-date_time --with-chrono --with-test
 
 **Note**: Select 32 or 64-bit with the `address-model=` option.
 

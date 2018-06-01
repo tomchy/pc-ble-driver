@@ -790,10 +790,13 @@ inline const Type& SSMAX(const Type& arg1, const Type& arg2)
 		#endif
 		#define SS_USE_FACET(loc, fac) std::use_facet<fac >(loc)
 
-	#elif defined(_MSC_VER )
+	#elif defined(_MSC_VER)
 
-		#define SS_USE_FACET(loc, fac) std::_USE(loc, fac)
-
+        #if (_MSC_VER < 1914)
+#           #define SS_USE_FACET(loc, fac) std::_USE(loc, fac)
+        #else
+            #define SS_USE_FACET(loc, fac) std::use_facet<fac >(loc)
+        #endif
 	// ...and
 	#elif defined(_RWSTD_NO_TEMPLATE_ON_RETURN_TYPE)
 

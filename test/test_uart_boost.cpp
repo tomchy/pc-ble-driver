@@ -47,17 +47,33 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <cstdlib>
+#include <thread>
+#include <random>
+
+#if defined(_MSC_VER)
+// Disable warning "This function or variable may be unsafe. Consider using _dupenv_s instead."
+#pragma warning(disable: 4996)
+#endif
 
 using namespace boost::unit_test;
+using namespace std::chrono_literals;
+using std::chrono::system_clock;
 
 BOOST_AUTO_TEST_CASE(open_close)
 {
+    std::string portA = std::getenv("BLE_DRIVER_TEST_SERIAL_PORT_A");
+    BOOST_TEST(portA.length() > 0);
+
+    std::string portB = std::getenv("BLE_DRIVER_TEST_SERIAL_PORT_B");
+    BOOST_TEST(portB.length() > 0);
+
 	auto ap = UartCommunicationParameters();
 	ap.baudRate = 1000000;
 	ap.dataBits = UartDataBitsEight;
 	ap.flowControl = UartFlowControlNone;
 	ap.parity = UartParityNone;
-	ap.portName = "COM4";
+	ap.portName = portA.c_str();
 	ap.stopBits = UartStopBitsOne;
 	auto a = new UartBoost(ap);
 
@@ -66,36 +82,61 @@ BOOST_AUTO_TEST_CASE(open_close)
 	bp.dataBits = UartDataBitsEight;
 	bp.flowControl = UartFlowControlNone;
 	bp.parity = UartParityNone;
-	bp.portName = "COM3";
+	bp.portName = portB.c_str();
 	bp.stopBits = UartStopBitsOne;
 	auto b = new UartBoost(bp);
 
+    std::vector<uint8_t> receivedOnA;
+    std::vector<uint8_t> receivedOnB;
+
+    // Generate random values to send
+    std::vector<uint8_t> sendOnB(10000);
+    std::vector<uint8_t> sendOnA(10000);
+
+    std::generate(sendOnB.begin(), sendOnB.end(), std::rand);
+    std::generate(sendOnA.begin(), sendOnA.end(), std::rand);
+
+    auto status_callback = [](sd_rpc_app_status_t code, const char *message) -> void {
+        std::cout << "code: " << code << " message: " << message << std::endl;
+        BOOST_TEST(code == NRF_SUCCESS);
+    };
+
+    auto log_callback = [&](sd_rpc_log_severity_t severity, std::string &message) -> void {
+        std::cout << "severity: " << severity << " message: " << message << std::endl;
+
+        if (severity == 1) {
+            char port[100];
+            auto ret = std::sscanf(message.c_str(), "UART read operation on port %s aborted.", port);
+            BOOST_TEST(ret == 1);
+
+            std::string port_(port);
+            BOOST_TEST((port_ == portA || port_ == portB));
+        }
+    };
+
 	b->open(
-		[](sd_rpc_app_status_t code, const char *message) -> void {
-			std::cout << "code: " << code << "message: " << message << std::endl;
+        status_callback,
+		[&](uint8_t *data, size_t length) -> void {
+            std::cout << length << "-";
+            receivedOnB.insert(receivedOnB.end(), data, data + length);
 		},
-		[](uint8_t *data, size_t length) -> void {
-			std::cout << "received data, length:" << length << std::endl;
-		},
-		[](sd_rpc_log_severity_t severity, std::string message) -> void {
-			std::cout << "severity:" << severity << "message:" << message << std::endl;
-		}
-	);
+        log_callback
+        );
 
 	a->open(
-		[](sd_rpc_app_status_t code, const char *message) -> void {
-			std::cout << "code: " << code << "message: " << message << std::endl;
+        status_callback,
+        [&](uint8_t *data, size_t length) -> void {
+            std::cout << length << "-";
+            receivedOnA.insert(receivedOnA.end(), data, data + length);
 		},
-		[](uint8_t *data, size_t length) -> void {
-			std::cout << "received data, length:" << length << std::endl;
-		},
-		[](sd_rpc_log_severity_t severity, std::string message) -> void {
-			std::cout << "severity:" << severity << "message:" << message << std::endl;
-		}
+        log_callback
 	);
 
-	b->send(std::vector<unsigned char> { 1, 2, 3 });
-	a->send(std::vector<unsigned char> { 11, 12, 13 });
+	b->send(sendOnB);
+	a->send(sendOnA);
+
+    // Let the data be sent between the serial ports before closing
+    std::this_thread::sleep_until(system_clock::now() + 1s);
 
 	b->close();
 	a->close();
@@ -103,5 +144,6 @@ BOOST_AUTO_TEST_CASE(open_close)
 	delete b;
 	delete a;
 
-	BOOST_TEST(false);
+    BOOST_TEST(sendOnA == receivedOnB);
+    BOOST_TEST(sendOnB == receivedOnA);
 }

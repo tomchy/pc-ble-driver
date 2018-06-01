@@ -85,10 +85,6 @@ foreach(SD_API_VER ${SD_API_VERS})
     add_library(${PC_BLE_DRIVER_${SD_API_VER}_STATIC_LIB} STATIC $<TARGET_OBJECTS:${PC_BLE_DRIVER_${SD_API_VER}_OBJ_LIB}>)
 endforeach(SD_API_VER)
 
-# build test_uart executable
-add_executable(test_uart test/test_uart.cpp)
-add_executable(test_uart_2 test/test_uart_2.cpp)
-
 # Set common include directories
 include_directories(
         include/common
@@ -140,5 +136,5 @@ foreach(SD_API_VER ${SD_API_VERS})
 endforeach(SD_API_VER)
 
 
-target_link_libraries(test_uart PRIVATE ${Boost_LIBRARIES})
-target_link_libraries(test_uart_2 PRIVATE ${Boost_LIBRARIES})
+# Add tests
+add_subdirectory(test)

@@ -793,7 +793,7 @@ inline const Type& SSMAX(const Type& arg1, const Type& arg2)
 	#elif defined(_MSC_VER)
 
         #if (_MSC_VER < 1914)
-#           #define SS_USE_FACET(loc, fac) std::_USE(loc, fac)
+            #define SS_USE_FACET(loc, fac) std::_USE(loc, fac)
         #else
             #define SS_USE_FACET(loc, fac) std::use_facet<fac >(loc)
         #endif

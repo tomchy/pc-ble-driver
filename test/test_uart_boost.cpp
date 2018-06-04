@@ -60,31 +60,56 @@ using namespace boost::unit_test;
 using namespace std::chrono_literals;
 using std::chrono::system_clock;
 
+struct PortStats {
+    uint32_t pktCount;
+    uint32_t pktMaxSize;
+    uint32_t pktMinSize;
+
+    PortStats() : pktCount(0), pktMinSize(std::numeric_limits<uint32_t>::max()), pktMaxSize(0) {}
+};
+
+std::ostream& operator<<(std::ostream &out, PortStats stats) {
+    out << "pkt_count: " << stats.pktCount
+        << " pkt_max_size: " << stats.pktMaxSize
+        << " pkt_min_size: ";
+
+    if (stats.pktMinSize == std::numeric_limits<uint32_t>::max()) {
+        out << "-";
+    }
+    else {
+        out << stats.pktMinSize;
+    }
+
+    return out;
+};
+
 BOOST_AUTO_TEST_CASE(open_close)
 {
+    auto envPortA = std::getenv("BLE_DRIVER_TEST_SERIAL_PORT_A");
+    BOOST_TEST_REQUIRE(envPortA != nullptr, "Environment variable BLE_DRIVER_TEST_SERIAL_PORT_A not set, terminating test.");
     std::string portA = std::getenv("BLE_DRIVER_TEST_SERIAL_PORT_A");
-    BOOST_TEST(portA.length() > 0);
 
+    auto envPortB = std::getenv("BLE_DRIVER_TEST_SERIAL_PORT_B");
+    BOOST_TEST_REQUIRE(envPortB != nullptr, "Environment variable BLE_DRIVER_TEST_SERIAL_PORT_B not set, terminating test.");
     std::string portB = std::getenv("BLE_DRIVER_TEST_SERIAL_PORT_B");
-    BOOST_TEST(portB.length() > 0);
 
-	auto ap = UartCommunicationParameters();
-	ap.baudRate = 1000000;
-	ap.dataBits = UartDataBitsEight;
-	ap.flowControl = UartFlowControlNone;
-	ap.parity = UartParityNone;
-	ap.portName = portA.c_str();
-	ap.stopBits = UartStopBitsOne;
-	auto a = new UartBoost(ap);
+    auto ap = UartCommunicationParameters();
+    ap.baudRate = 1000000;
+    ap.dataBits = UartDataBitsEight;
+    ap.flowControl = UartFlowControlNone;
+    ap.parity = UartParityNone;
+    ap.portName = portA.c_str();
+    ap.stopBits = UartStopBitsOne;
+    auto a = new UartBoost(ap);
 
-	auto bp = UartCommunicationParameters();
-	bp.baudRate = 1000000;
-	bp.dataBits = UartDataBitsEight;
-	bp.flowControl = UartFlowControlNone;
-	bp.parity = UartParityNone;
-	bp.portName = portB.c_str();
-	bp.stopBits = UartStopBitsOne;
-	auto b = new UartBoost(bp);
+    auto bp = UartCommunicationParameters();
+    bp.baudRate = 1000000;
+    bp.dataBits = UartDataBitsEight;
+    bp.flowControl = UartFlowControlNone;
+    bp.parity = UartParityNone;
+    bp.portName = portB.c_str();
+    bp.stopBits = UartStopBitsOne;
+    auto b = new UartBoost(bp);
 
     std::vector<uint8_t> receivedOnA;
     std::vector<uint8_t> receivedOnB;
@@ -97,53 +122,77 @@ BOOST_AUTO_TEST_CASE(open_close)
     std::generate(sendOnA.begin(), sendOnA.end(), std::rand);
 
     auto status_callback = [](sd_rpc_app_status_t code, const char *message) -> void {
-        std::cout << "code: " << code << " message: " << message << std::endl;
-        BOOST_TEST(code == NRF_SUCCESS);
+        BOOST_TEST_MESSAGE("code: " << code << " message: " << message);
+        BOOST_TEST_REQUIRE(code == NRF_SUCCESS, message);
     };
 
     auto log_callback = [&](sd_rpc_log_severity_t severity, std::string &message) -> void {
-        std::cout << "severity: " << severity << " message: " << message << std::endl;
+        BOOST_TEST_MESSAGE("severity: " << severity << " message: " << message);
 
         if (severity == 1) {
             char port[100];
             auto ret = std::sscanf(message.c_str(), "UART read operation on port %s aborted.", port);
-            BOOST_TEST(ret == 1);
+            BOOST_TEST_REQUIRE(ret == 1);
 
             std::string port_(port);
-            BOOST_TEST((port_ == portA || port_ == portB));
+            BOOST_TEST_REQUIRE((port_ == portA || port_ == portB));
         }
     };
 
-	b->open(
+    PortStats portAStats;
+    PortStats portBStats;
+
+    b->open(
         status_callback,
-		[&](uint8_t *data, size_t length) -> void {
-            std::cout << length << "-";
+        [&](uint8_t *data, size_t length) -> void {
             receivedOnB.insert(receivedOnB.end(), data, data + length);
-		},
+
+            if (portBStats.pktMaxSize < length) {
+                portBStats.pktMaxSize = length;
+            }
+
+            if (portBStats.pktMinSize > length) {
+                portBStats.pktMinSize = length;
+            }
+
+            portBStats.pktCount++;
+        },
         log_callback
         );
 
-	a->open(
+    a->open(
         status_callback,
         [&](uint8_t *data, size_t length) -> void {
-            std::cout << length << "-";
             receivedOnA.insert(receivedOnA.end(), data, data + length);
-		},
-        log_callback
-	);
 
-	b->send(sendOnB);
-	a->send(sendOnA);
+            if (portAStats.pktMaxSize < length) {
+                portAStats.pktMaxSize = length;
+            }
+
+            if (portAStats.pktMinSize > length) {
+                portAStats.pktMinSize = length;
+            }
+
+            portAStats.pktCount++;
+        },
+        log_callback
+    );
+
+    b->send(sendOnB);
+    a->send(sendOnA);
 
     // Let the data be sent between the serial ports before closing
     std::this_thread::sleep_until(system_clock::now() + 1s);
 
-	b->close();
-	a->close();
+    b->close();
+    a->close();
 
-	delete b;
-	delete a;
+    delete b;
+    delete a;
 
-    BOOST_TEST(sendOnA == receivedOnB);
-    BOOST_TEST(sendOnB == receivedOnA);
+    BOOST_TEST_REQUIRE(sendOnA == receivedOnB);
+    BOOST_TEST_REQUIRE(sendOnB == receivedOnA);
+
+    BOOST_TEST_MESSAGE("stats port A " << portAStats);
+    BOOST_TEST_MESSAGE("stats port B " << portBStats);
 }

@@ -24,7 +24,11 @@ endif()
 
 # Build executable
 add_executable(test_uart_boost test_uart_boost.cpp)
+add_executable(test_h5_transport test_h5_transport.cpp)
 
 target_link_libraries(test_uart_boost PRIVATE pc_ble_driver_static_sd_api_v3 ${Boost_LIBRARIES})
+target_link_libraries(test_h5_transport PRIVATE pc_ble_driver_static_sd_api_v3 ${Boost_LIBRARIES})
 
 add_test(NAME uart_boost COMMAND test_uart_boost)
+add_test(NAME h5_transport COMMAND test_h5_transport)
+

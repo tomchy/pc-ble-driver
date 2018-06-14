@@ -243,7 +243,11 @@ void UartBoost::readHandler(const boost::system::error_code& errorCode, const si
 
 void UartBoost::writeHandler (const boost::system::error_code& errorCode, const size_t bytesTransferred)
 {
-    if (errorCode == boost::asio::error::operation_aborted)
+    if (errorCode == boost::system::errc::success)
+    {
+        asyncWrite();
+    }
+    else if (errorCode == boost::asio::error::operation_aborted)
     {
         std::stringstream message;
         message << "UART write operation on port " << uartSettingsBoost.getPortName().c_str() << " aborted.";
@@ -256,10 +260,14 @@ void UartBoost::writeHandler (const boost::system::error_code& errorCode, const 
         queueMutex.unlock();
         return;
     }
-
-    // TODO: check other error codes
-
-    asyncWrite();
+    else
+    {
+        std::stringstream message;
+        message << "UART write operation on port " << uartSettingsBoost.getPortName().c_str()
+            << " failed with error code " << errorCode.value()
+            << ": " << errorCode.message();
+        logCallback(SD_RPC_LOG_ERROR, message.str());
+    }
 }
 
 void UartBoost::startRead()

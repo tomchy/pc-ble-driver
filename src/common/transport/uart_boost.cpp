@@ -39,9 +39,11 @@
 #include "uart_settings_boost.h"
 #include "nrf_error.h"
 
+#include <functional>
 #include <boost/bind.hpp>
 #include <boost/asio.hpp>
 
+#include <iostream>
 #include <sstream>
 #include <mutex>
 
@@ -50,7 +52,6 @@ UartBoost::UartBoost(const UartCommunicationParameters &communicationParameters)
       ioService(),
       serialPort(ioService),
       workNotifier(ioService),
-      ioWorkThread(),
       readBuffer(),
       writeBufferVector(),
       writeQueue(),
@@ -81,7 +82,7 @@ uint32_t UartBoost::open(status_cb_t status_callback, data_cb_t data_callback, l
         std::stringstream message;
         message << "Exception thrown on " << ex.what() << " on UART port " << uartSettingsBoost.getPortName().c_str() << ".";
         statusCallback(IO_RESOURCES_UNAVAILABLE, message.str().c_str());
-            return NRF_ERROR_INTERNAL;
+        return NRF_ERROR_INTERNAL;
     }
 
     const auto baudRate = uartSettingsBoost.getBoostBaudRate();
@@ -107,9 +108,19 @@ uint32_t UartBoost::open(status_cb_t status_callback, data_cb_t data_callback, l
                                    boost::asio::placeholders::error,
                                    boost::asio::placeholders::bytes_transferred);
 
-        // run the IO service as a separate thread, so the main thread can block on standard input
-        boost::function<std::size_t()> ioServiceRun = boost::bind(&boost::asio::io_service::run, &ioService);
-        ioWorkThread = boost::thread(ioServiceRun);
+        // run execution of io_service handlers in a separate thread
+        ioServiceThread = std::thread([&]() {
+            try {
+                auto count = ioService.run();
+                std::stringstream message;
+                message << "UART io_context executed " << count << " handlers.";
+                logCallback(SD_RPC_LOG_DEBUG, message.str());
+            } catch (boost::system::system_error &e) {
+                std::stringstream message;
+                message << "UART io_context error: " << e.what();
+                logCallback(SD_RPC_LOG_ERROR, message.str());
+            }
+        });
     }
     catch (std::exception& ex)
     {
@@ -170,10 +181,9 @@ uint32_t UartBoost::close()
 {
     try
     {
-        serialPort.cancel();
         serialPort.close();
         ioService.stop();
-        ioWorkThread.join();
+        ioServiceThread.join();
 
         std::stringstream message;
         message << "UART port " << uartSettingsBoost.getPortName().c_str() << " closed.";
@@ -183,7 +193,7 @@ uint32_t UartBoost::close()
     catch (std::exception& ex)
     {
         std::stringstream message;
-        message << "Exception thrown on " << ex.what() << " on UART port "  << uartSettingsBoost.getPortName().c_str() << ".";
+        message << "Error closing UART " << uartSettingsBoost.getPortName().c_str() << ", " << ex.what() << ".";
         logCallback(SD_RPC_LOG_ERROR, message.str());
     }
 
@@ -246,6 +256,8 @@ void UartBoost::writeHandler (const boost::system::error_code& errorCode, const 
         queueMutex.unlock();
         return;
     }
+
+    // TODO: check other error codes
 
     asyncWrite();
 }

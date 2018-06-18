@@ -136,7 +136,7 @@ uint32_t UartBoost::open(status_cb_t status_callback, data_cb_t data_callback, l
     {
         std::stringstream message;
         message << "Error setting up serial port " << uartSettingsBoost.getPortName() << ". " << ex.what();
-        statusCallback(IO_RESOURCES_UNAVAILABLE, message.str());
+        statusCallback(IO_RESOURCES_UNAVAILABLE, message.str().c_str());
         return NRF_ERROR_INTERNAL;
     }
 
@@ -299,7 +299,7 @@ void UartBoost::readHandler(const boost::system::error_code& errorCode, const si
         std::stringstream message;
         message << "serial port read failed on port " << uartSettingsBoost.getPortName() << ". ";
         message << "Error: " << errorCode.message() << " [" << errorCode.value() << "]";
-        statusCallback(IO_RESOURCES_UNAVAILABLE, message.str());
+        statusCallback(IO_RESOURCES_UNAVAILABLE, message.str().c_str());
         // TODO: handle this case in upper layers
     }
 }

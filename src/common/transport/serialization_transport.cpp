@@ -167,7 +167,8 @@ void SerializationTransport::eventHandlingRunner()
         {
             eventData_t eventData = eventQueue.front();
             eventQueue.pop();
-            // Allocate memory to store decoded event including an unknown quantity of padding
+            eventLock.unlock();
+
 
             // Set security context
             BLESecurityContext context(this);
@@ -190,21 +191,9 @@ void SerializationTransport::eventHandlingRunner()
             }
 
             free(eventData.data);
+
+            eventLock.lock();
         }
-
-        std::unique_lock<std::mutex> eventLock(eventMutex);
-
-        if (!runEventThread)
-        {
-            break;
-        }
-
-        if (!eventQueue.empty())
-        {
-            continue;
-        }
-
-        eventWaitCondition.wait(eventLock);
     }
 }
 

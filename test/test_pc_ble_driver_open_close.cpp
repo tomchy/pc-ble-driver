@@ -49,7 +49,6 @@
 
 #include <string>
 #include <thread>
-#include <iostream>
 #include <sstream>
 
 #ifdef _WIN32
@@ -72,7 +71,7 @@ typedef struct
     uint16_t      data_len; /**< Length of data. */
 } data_t;
 
-static adapter_t * m_adapter = NULL;
+static adapter_t * m_adapter = nullptr;
 
 #if NRF_SD_BLE_API >= 5
 static uint32_t    m_config_id = 1;
@@ -88,9 +87,9 @@ static const ble_gap_scan_params_t m_scan_param =
 #if NRF_SD_BLE_API >= 3
      0,                       // adv_dir_report not set.
 #endif
-     (uint16_t)SCAN_INTERVAL,
-     (uint16_t)SCAN_WINDOW,
-     (uint16_t)SCAN_TIMEOUT
+     static_cast<uint16_t>(SCAN_INTERVAL),
+     static_cast<uint16_t>(SCAN_WINDOW),
+     static_cast<uint16_t>(SCAN_TIMEOUT)
 };
 
 /* Local function forward declarations */
@@ -128,7 +127,7 @@ static void log_handler(adapter_t * adapter, sd_rpc_log_severity_t severity, con
 static void on_adv_report(const ble_gap_evt_t * const p_ble_gap_evt)
 {
     // Log the Bluetooth device address of advertisement packet received.
-    auto address = ble_address_to_string_convert(p_ble_gap_evt->params.adv_report.peer_addr);
+    const auto address = ble_address_to_string_convert(p_ble_gap_evt->params.adv_report.peer_addr);
     NRF_LOG("Received advertisement report with device address: " << address);
 }
 
@@ -136,7 +135,7 @@ static void on_timeout(const ble_gap_evt_t * const p_ble_gap_evt)
 {
     if (p_ble_gap_evt->params.timeout.src == BLE_GAP_TIMEOUT_SRC_SCAN)
     {
-        auto result = sd_ble_gap_scan_start(m_adapter, &m_scan_param);
+        const auto result = sd_ble_gap_scan_start(m_adapter, &m_scan_param);
 
         if (result != NRF_SUCCESS)
         {
@@ -148,14 +147,10 @@ static void on_timeout(const ble_gap_evt_t * const p_ble_gap_evt)
 
 static adapter_t * adapter_init(const char * serial_port, uint32_t baud_rate)
 {
-    physical_layer_t  * phy;
-    data_link_layer_t * data_link_layer;
-    transport_layer_t * transport_layer;
-
-    phy = sd_rpc_physical_layer_create_uart(serial_port, baud_rate, SD_RPC_FLOW_CONTROL_NONE,
-                                            SD_RPC_PARITY_NONE);
-    data_link_layer = sd_rpc_data_link_layer_create_bt_three_wire(phy, 100);
-    transport_layer = sd_rpc_transport_layer_create(data_link_layer, 100);
+    const auto phy = sd_rpc_physical_layer_create_uart(serial_port, baud_rate, SD_RPC_FLOW_CONTROL_NONE,
+                                                               SD_RPC_PARITY_NONE);
+    const auto data_link_layer = sd_rpc_data_link_layer_create_bt_three_wire(phy, 100);
+    const auto transport_layer = sd_rpc_transport_layer_create(data_link_layer, 100);
     return sd_rpc_adapter_create(transport_layer);
 }
 
@@ -174,7 +169,7 @@ static std::string ble_address_to_string_convert(ble_gap_addr_t address)
 static uint32_t ble_stack_init()
 {
     uint32_t            err_code;
-    uint32_t *          app_ram_base = NULL;
+    uint32_t *          app_ram_base = nullptr;
 
 #if NRF_SD_BLE_API <= 3
     ble_enable_params_t ble_enable_params;
@@ -253,7 +248,7 @@ void ble_cfg_set(uint8_t conn_cfg_tag)
 
 static void ble_evt_dispatch(adapter_t * adapter, ble_evt_t * p_ble_evt)
 {
-    if (p_ble_evt == NULL)
+    if (p_ble_evt == nullptr)
     {
         NRF_LOG("Received an empty BLE event");
         return;
@@ -275,16 +270,14 @@ static void ble_evt_dispatch(adapter_t * adapter, ble_evt_t * p_ble_evt)
 
 TEST_CASE("test_pc_ble_driver_open_close")
 {
-    uint32_t baudRate = BAUD_RATE;
-
     auto env = ::test::getEnvironment();
-    REQUIRE(env.serialPorts.size() > 0);
+    REQUIRE(!env.serialPorts.empty());
     auto serialPort = env.serialPorts.at(0);
-    auto numberOfIterations = env.numberOfIterations;
+    const auto numberOfIterations = env.numberOfIterations;
 
     SECTION("open_close_open_iterations")
     {
-        baudRate = serialPort.baudRate;
+        const uint32_t baudRate = serialPort.baudRate;
 
         INFO("Serial port used: " << serialPort.port);
         INFO("Baud rate used: " << baudRate);

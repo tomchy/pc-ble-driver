@@ -59,7 +59,7 @@
 #include "h5.h"
 #include "slip.h"
 
-#include <stdint.h>
+#include <cstdint>
 #include <chrono>
 #include <iostream>
 #include <algorithm>
@@ -67,8 +67,6 @@
 #include <iomanip>
 #include <thread>
 #include <map>
-
-#include <exception>
 
 // Constants use for state machine states UNINITIALIZED and INITIALIZED
 const auto NON_ACTIVE_STATE_TIMEOUT = std::chrono::milliseconds(250);  // Duration to wait until resending a packet
@@ -82,8 +80,8 @@ const auto RESET_WAIT_DURATION = std::chrono::milliseconds(300);  // Duration to
 H5Transport::H5Transport(Transport *_nextTransportLayer, uint32_t retransmission_interval)
     : Transport(),
     seqNum(0), ackNum(0), c0Found(false),
-    unprocessedData(), incomingPacketCount(0), outgoingPacketCount(0),
-    errorPacketCount(0),
+    retransmissionInterval(std::chrono::milliseconds(retransmission_interval)),
+    incomingPacketCount(0), outgoingPacketCount(0), errorPacketCount(0),
     currentState(STATE_START),
     stateMachineReady(false)
 {
@@ -132,7 +130,7 @@ std::map<h5_pkt_type_t, std::string> H5Transport::pktTypeString{
 
 #pragma endregion
 
-uint32_t H5Transport::open(const status_cb_t status_callback, data_cb_t data_callback, log_cb_t log_callback)
+uint32_t H5Transport::open(const status_cb_t &status_callback, const data_cb_t &data_callback, const log_cb_t &log_callback)
 {
     auto errorCode = Transport::open(status_callback, data_callback, log_callback);
 
@@ -151,7 +149,7 @@ uint32_t H5Transport::open(const status_cb_t status_callback, data_cb_t data_cal
     // Wait for the state machine to be ready
     startStateMachine();
 
-    auto _exitCriterias = dynamic_cast<StartExitCriterias*>(exitCriterias[currentState]);
+    const auto _exitCriterias = dynamic_cast<StartExitCriterias*>(exitCriterias[currentState]);
     lastPacket.clear();
 
     statusCallback = std::bind(&H5Transport::statusHandler, this, std::placeholders::_1, std::placeholders::_2);
@@ -213,7 +211,7 @@ uint32_t H5Transport::open(const status_cb_t status_callback, data_cb_t data_cal
 uint32_t H5Transport::close()
 {
     std::unique_lock<std::mutex> stateMachineLock(stateMachineMutex);
-    auto exitCriteria = exitCriterias[currentState];
+    const auto exitCriteria = exitCriterias[currentState];
 
     if (exitCriteria != nullptr)
     {
@@ -226,8 +224,8 @@ uint32_t H5Transport::close()
 
     stopStateMachine();
 
-    auto errorCode1 = nextTransportLayer->close();
-    auto errorCode2 = Transport::close();
+    const auto errorCode1 = nextTransportLayer->close();
+    const auto errorCode2 = Transport::close();
 
     if (errorCode1 != NRF_SUCCESS)
     {
@@ -363,7 +361,7 @@ void H5Transport::processPacket(payload_t &packet)
         }
         else if (currentState == STATE_INITIALIZED)
         {
-            auto exit = dynamic_cast<InitializedExitCriterias*>(exitCriterias[currentState]);
+            const auto exit = dynamic_cast<InitializedExitCriterias*>(exitCriterias[currentState]);
 
             if (H5Transport::isSyncConfigResponsePacket(h5Payload))
             {
@@ -380,7 +378,7 @@ void H5Transport::processPacket(payload_t &packet)
         }
         else if (currentState == STATE_ACTIVE)
         {
-            auto exit = dynamic_cast<ActiveExitCriterias*>(exitCriterias[currentState]);
+            const auto exit = dynamic_cast<ActiveExitCriterias*>(exitCriterias[currentState]);
 
             if (H5Transport::isSyncPacket(h5Payload))
             {
@@ -439,7 +437,7 @@ void H5Transport::statusHandler(sd_rpc_app_status_t code, const char * error)
     if (code == IO_RESOURCES_UNAVAILABLE)
     {
         std::unique_lock<std::mutex> stateMachineLock(stateMachineMutex);
-        auto exitCriteria = exitCriterias[currentState];
+        const auto exitCriteria = exitCriterias[currentState];
 
         if (exitCriteria != nullptr)
         {
@@ -695,7 +693,7 @@ void H5Transport::setupStateMachine()
         ackNum = 0;
 
         statusHandler(CONNECTION_ACTIVE, "Connection active");
-        stateMachineChange.wait(stateMachineLock, [this, &exit] {
+        stateMachineChange.wait(stateMachineLock, [&exit] {
             return exit->isFullfilled();
         });
 
@@ -780,7 +778,7 @@ void H5Transport::stateMachineWorker()
 {
     while (currentState != STATE_FAILED && currentState != STATE_CLOSED && currentState != STATE_NO_RESPONSE)
     {
-        auto nextState = stateActions[currentState]();
+        const auto nextState = stateActions[currentState]();
 
         // Make sure that state is not changed when assigning a new current state
         {
@@ -855,7 +853,7 @@ void H5Transport::sendControlPacket(control_pkt_type type)
         h5_packet = LINK_CONTROL_PACKET;
     }
 
-    auto payload = pkt_pattern[type];
+    const auto payload = pkt_pattern[type];
     payload_t h5Packet;
 
     h5_encode(payload,
@@ -887,7 +885,7 @@ std::string H5Transport::pktTypeToString(h5_pkt_type_t pktType)
     return pktTypeString[pktType];
 }
 
-std::string H5Transport::asHex(payload_t &packet) const
+std::string H5Transport::asHex(payload_t &packet)
 {
     std::stringstream hex;
 
@@ -898,11 +896,11 @@ std::string H5Transport::asHex(payload_t &packet) const
     return hex.str();
 }
 
-std::string H5Transport::hciPacketLinkControlToString(payload_t payload) const
+std::string H5Transport::hciPacketLinkControlToString(payload_t payload)
 {
     std::stringstream retval;
 
-    auto configToString = [](uint8_t config)
+    const auto configToString = [](const uint8_t config)
     {
         std::stringstream info;
         info << " sliding-window-size:" << (config & 0x07);
@@ -968,7 +966,7 @@ std::string H5Transport::h5PktToString(bool out, payload_t &h5Packet) const
     uint16_t payload_length;
     uint8_t header_checksum;
 
-    auto err_code = h5_decode(
+    const auto err_code = h5_decode(
         h5Packet,
         payload,
         &seq_num,
@@ -1026,7 +1024,7 @@ void H5Transport::logPacket(bool outgoing, payload_t &packet)
         incomingPacketCount++;
     }
 
-    std::string logLine = h5PktToString(outgoing, packet).c_str();
+    const std::string logLine = h5PktToString(outgoing, packet);
 
     if (upperLogCallback != nullptr)
     {

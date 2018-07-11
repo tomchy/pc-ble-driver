@@ -38,7 +38,6 @@
 #include "slip.h"
 #include "nrf_error.h"
 #include <vector>
-#include <algorithm>
 
 #define SLIP_END 0xC0
 #define SLIP_ESC 0xDB
@@ -49,21 +48,21 @@ void slip_encode(std::vector<uint8_t> &in_packet, std::vector<uint8_t> &out_pack
 {
     out_packet.push_back(SLIP_END);
 
-    for (size_t i = 0; i < in_packet.size(); i++)
+    for (unsigned char i : in_packet)
     {
-        if (in_packet[i] == SLIP_END)
+        if (i == SLIP_END)
         {
             out_packet.push_back(SLIP_ESC);
             out_packet.push_back(SLIP_ESC_END);
         }
-        else if (in_packet[i] == SLIP_ESC)
+        else if (i == SLIP_ESC)
         {
             out_packet.push_back(SLIP_ESC);
             out_packet.push_back(SLIP_ESC_ESC);
         }
         else
         {
-            out_packet.push_back(in_packet[i]);
+            out_packet.push_back(i);
         }
     }
 

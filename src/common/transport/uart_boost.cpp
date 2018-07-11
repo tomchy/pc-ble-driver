@@ -48,13 +48,7 @@
 #include <mutex>
 
 UartBoost::UartBoost(const UartCommunicationParameters &communicationParameters)
-    : Transport(),
-      readBuffer(),
-      writeBufferVector(),
-      writeQueue(),
-      queueMutex(),
-      callbackReadHandle(),
-      callbackWriteHandle(),
+    : readBuffer(),
       uartSettingsBoost(communicationParameters),
       asyncWriteInProgress(false),
       ioServiceThread(nullptr)
@@ -70,15 +64,8 @@ UartBoost::~UartBoost()
 {
     try
     {
-        if (serialPort != nullptr)
-        {
-            delete serialPort;
-        }
-
-        if (workNotifier != nullptr)
-        {
-            delete workNotifier;
-        }
+        delete serialPort;
+        delete workNotifier;
 
         if (ioServiceThread != nullptr)
         {
@@ -89,10 +76,7 @@ UartBoost::~UartBoost()
             }
         }
 
-        if (ioService != nullptr)
-        {
-            delete ioService;
-        }
+        delete ioService;
     }
     catch (std::exception& e)
     {
@@ -101,7 +85,7 @@ UartBoost::~UartBoost()
     }
 }
 
-uint32_t UartBoost::open(status_cb_t status_callback, data_cb_t data_callback, log_cb_t log_callback)
+uint32_t UartBoost::open(const status_cb_t &status_callback, const data_cb_t &data_callback, const log_cb_t &log_callback)
 {
     Transport::open(status_callback, data_callback, log_callback);
 
@@ -160,7 +144,7 @@ uint32_t UartBoost::open(status_cb_t status_callback, data_cb_t data_callback, l
 
         ioServiceThread = new std::thread([&]() {
             try {
-                auto count = ioService->run();
+                const auto count = ioService->run();
                 std::stringstream message;
                 message << "serial io_context executed " << count << " handlers.";
                 upperLogCallback(SD_RPC_LOG_TRACE, message.str());
@@ -280,7 +264,7 @@ void UartBoost::readHandler(const boost::system::error_code& errorCode, const si
 {
     if (errorCode == boost::system::errc::success)
     {
-        auto readBufferData = readBuffer.data();
+        const auto readBufferData = readBuffer.data();
         upperDataCallback(readBufferData, bytesTransferred);
         asyncRead(); // Initiate a new read
     }
@@ -336,7 +320,7 @@ void UartBoost::startRead()
 
 void UartBoost::asyncRead()
 {
-    auto mutableReadBuffer = boost::asio::buffer(readBuffer, BUFFER_SIZE);
+    const auto mutableReadBuffer = boost::asio::buffer(readBuffer, BUFFER_SIZE);
     serialPort->async_read_some(mutableReadBuffer, callbackReadHandle);
 }
 
@@ -345,7 +329,7 @@ void UartBoost::asyncWrite()
     { //lock_guard scope
         std::lock_guard<std::mutex> guard(queueMutex);
 
-        auto numBytesPending = writeQueue.size();
+        const auto numBytesPending = writeQueue.size();
 
         if (numBytesPending == 0)
         {
@@ -361,6 +345,6 @@ void UartBoost::asyncWrite()
         writeQueue.clear();
     }
 
-    auto buffer = boost::asio::buffer(writeBufferVector, writeBufferVector.size());
+    const auto buffer = boost::asio::buffer(writeBufferVector, writeBufferVector.size());
     boost::asio::async_write(*serialPort, buffer, callbackWriteHandle);
 }

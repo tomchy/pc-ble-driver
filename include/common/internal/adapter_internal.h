@@ -57,7 +57,7 @@ class AdapterInternal {
 
         void statusHandler(sd_rpc_app_status_t code, const char * error);
         void eventHandler(ble_evt_t *event);
-        void logHandler(sd_rpc_log_severity_t severity, std::string log_message);
+        void logHandler(sd_rpc_log_severity_t severity, const std::string &log_message);
 
         SerializationTransport *transport;
 

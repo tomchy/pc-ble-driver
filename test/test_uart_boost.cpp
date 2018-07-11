@@ -45,7 +45,6 @@
 #include "uart_boost.h"
 #include "test_setup.h"
 
-#include <iostream>
 #include <string>
 #include <vector>
 #include <cstdlib>
@@ -98,7 +97,7 @@ TEST_CASE("open_close")
     auto envPortA = env.serialPorts.at(0);
     auto portA = envPortA.port.c_str();
 
-    auto ap = UartCommunicationParameters();
+    UartCommunicationParameters ap;
     ap.baudRate = envPortA.baudRate;
     ap.dataBits = UartDataBitsEight;
     ap.flowControl = UartFlowControlNone;
@@ -110,7 +109,7 @@ TEST_CASE("open_close")
     auto envPortB = env.serialPorts.at(1);
     auto portB = envPortB.port.c_str();
 
-    auto bp = UartCommunicationParameters();
+    UartCommunicationParameters bp;
     bp.baudRate = envPortB.baudRate;
     bp.dataBits = UartDataBitsEight;
     bp.flowControl = UartFlowControlNone;
@@ -131,7 +130,7 @@ TEST_CASE("open_close")
     std::generate(sendOnB.begin(), sendOnB.end(), std::rand);
     std::generate(sendOnA.begin(), sendOnA.end(), std::rand);
 
-    auto status_callback = [&error](sd_rpc_app_status_t code, const char *message) -> void
+    const auto status_callback = [&error](sd_rpc_app_status_t code, const char *message) -> void
     {
         NRF_LOG("code: " << code << " message: " << message);
         if (code != NRF_SUCCESS)
@@ -141,13 +140,13 @@ TEST_CASE("open_close")
         }
     };
 
-    auto log_callback = [&portA, &portB, &error](sd_rpc_log_severity_t severity, std::string message) -> void
+    const auto log_callback = [&portA, &portB, &error](sd_rpc_log_severity_t severity, std::string message) -> void
     {
         NRF_LOG("severity: " << severity << " message: " << message);
 
         if (severity == 1)
         {
-            std::regex port_regex(".*read on port (\\S+).*");
+            const std::regex port_regex(".*read on port (\\S+).*");
             std::smatch matches;
             std::regex_search(message, matches, port_regex);
 

@@ -41,11 +41,7 @@
 
 using namespace boost;
 
-UartSettingsBoost::UartSettingsBoost()
-    : UartSettings()
-{
-    //Empty
-}
+UartSettingsBoost::UartSettingsBoost() = default;
 
 UartSettingsBoost::UartSettingsBoost(const UartCommunicationParameters &communicationParameters)
     : UartSettings(communicationParameters)

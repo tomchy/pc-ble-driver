@@ -77,7 +77,7 @@ typedef enum
 /*@brief UART communication parameters. */
 typedef struct
 {
-    const char * portName;
+    std::string portName;
     uint32_t baudRate;
     UartFlowControl flowControl;
     UartParity parity;
@@ -103,7 +103,7 @@ public:
     virtual ~UartSettings();
 
     /*@brief Sets the name of the serial port. */
-    void setPortName(const std::string value);
+    void setPortName(const std::string &value);
 
     /*@brief Sets the baud rate. */
     void setBaudRate(const uint32_t value);
@@ -121,7 +121,7 @@ public:
     void setDataBits(const UartDataBits value);
 
     /*@brief Returns the currently configured serial port name. */
-    std::string getPortName();
+    std::string getPortName() const;
 
     /*@brief Returns the currently configured Baud Rate. */
     uint32_t getBaudRate() const;

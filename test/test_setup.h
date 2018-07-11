@@ -67,7 +67,7 @@ namespace test
     {
         std::vector<SerialPort> serialPorts;
         uint32_t numberOfIterations;
-        sd_rpc_log_severity_t driverLogLevel;
+        sd_rpc_log_severity_t driverLogLevel = SD_RPC_LOG_INFO;
     };
 
     Environment getEnvironment()

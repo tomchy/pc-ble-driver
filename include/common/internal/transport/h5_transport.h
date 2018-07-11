@@ -73,7 +73,7 @@ public:
     H5Transport(Transport *nextTransportLayer, uint32_t retransmission_interval);
     ~H5Transport();
     
-    uint32_t open(status_cb_t status_callback, data_cb_t data_callback, log_cb_t log_callback) override;
+    uint32_t open(const status_cb_t &status_callback, const data_cb_t &data_callback, const log_cb_t &log_callback) override;
     uint32_t close() override;
     uint32_t send(const std::vector<uint8_t> &data) override;
 
@@ -128,11 +128,13 @@ private:
     void log(std::string &logLine) const;
     void log(char const *logLine) const;
     void logStateTransition(h5_state_t from, h5_state_t to) const;
+    
     static std::string stateToString(h5_state_t state);
-    std::string asHex(payload_t &packet) const;
-    std::string hciPacketLinkControlToString(payload_t  payload) const;
-    std::string h5PktToString(bool out, payload_t  &h5Packet) const;
+    static std::string asHex(payload_t &packet);
+    static std::string hciPacketLinkControlToString(payload_t  payload);
     static std::string pktTypeToString(h5_pkt_type_t pktType);
+
+    std::string h5PktToString(bool out, payload_t  &h5Packet) const;
 
     // State machine related
     h5_state_t currentState;

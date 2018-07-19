@@ -77,8 +77,11 @@ namespace testutil
         // The service used by the test
         uint16_t service_handle = BLE_GATT_HANDLE_INVALID;
         
-        // The characteristic used by the test
-        uint16_t characteristic_handle = BLE_GATT_HANDLE_INVALID;
+        // The characteristic declaration handle used by the test
+        uint16_t characteristic_decl_handle = BLE_GATT_HANDLE_INVALID;
+
+        // The characteristic value handle used by the test
+        uint16_t characteristic_value_handle = BLE_GATT_HANDLE_INVALID;
 
         // The descriptor used by the test
         uint16_t descriptor_handle = BLE_GATT_HANDLE_INVALID;
@@ -256,13 +259,13 @@ namespace testutil
             ble_gattc_handle_range_t handle_range;
             NRF_LOG(role() << " Discovering characteristic's descriptors");
 
-            if (scratchpad.characteristic_handle == 0)
+            if (scratchpad.characteristic_decl_handle == 0)
             {
                 NRF_LOG(role() << " No characteristic handle specified.");
                 return NRF_ERROR_INVALID_STATE;
             }
 
-            handle_range.start_handle = scratchpad.characteristic_handle;
+            handle_range.start_handle = scratchpad.characteristic_decl_handle;
             handle_range.end_handle = scratchpad.service_end_handle;
 
             return sd_ble_gattc_descriptors_discover(m_adapter, scratchpad.connection_handle, &handle_range);
@@ -336,42 +339,82 @@ namespace testutil
         {
             auto eventId = p_ble_evt->header.evt_id;
 
+            const auto logGenericUnprocessed = [this, &eventId]()
+            {
+                NRF_LOG(role() << " Unprocessed event: 0x" << std::setfill('0') << std::setw(2) << std::hex << (uint32_t)eventId);
+            };
+
             if (eventId >= BLE_GAP_EVT_BASE && eventId <= BLE_GAP_EVT_LAST)
             {
+                const auto logUnprocessed = [this, &eventId]()
+                {
+                    NRF_LOG(role() << " Unprocessed GAP event: 0x" << std::setfill('0') << std::setw(2) << std::hex << (uint32_t)eventId);
+                };
+
                 if (m_gapEventCallback != nullptr)
                 {
                     if (!m_gapEventCallback(eventId, &(p_ble_evt->evt.gap_evt)))
                     {
-                        NRF_LOG(role() << " Unprocessed GAP event: 0x" << std::setfill('0') << std::setw(2) << std::hex << (uint32_t)eventId);
+                        logUnprocessed();
                     }
+                }
+                else
+                {
+                    logUnprocessed();
                 }
             }
             else if (eventId >= BLE_GATTC_EVT_BASE && eventId <= BLE_GATTC_EVT_LAST)
             {
+                const auto logUnprocessed = [this, &eventId]()
+                {
+                    NRF_LOG(role() << " Unprocessed GATTC event: 0x" << std::setfill('0') << std::setw(2) << std::hex << (uint32_t)eventId);
+                };
+
                 if (m_gattcEventCallback != nullptr)
                 {
                     if (!m_gattcEventCallback(eventId, &(p_ble_evt->evt.gattc_evt)))
                     {
-                        NRF_LOG(role() <<  " Unprocessed GATTC event: 0x" << std::setfill('0') << std::setw(2) << std::hex << (uint32_t)eventId);
+                        logUnprocessed();
                     }
+                }
+                else
+                {
+                    logUnprocessed();
                 }
             }
             else if (eventId >= BLE_GATTS_EVT_BASE && eventId <= BLE_GATTS_EVT_LAST)
             {
+                const auto logUnprocessed = [this, &eventId]()
+                {
+                    NRF_LOG(role() << " Unprocessed GATTS event: 0x" << std::setfill('0') << std::setw(2) << std::hex << (uint32_t)eventId);
+                };
+
                 if (m_gattsEventCallback != nullptr)
                 {
                     if (!m_gattsEventCallback(eventId, &(p_ble_evt->evt.gatts_evt)))
                     {
-                        NRF_LOG(role() << " Unprocessed GATTS event: 0x" << std::setfill('0') << std::setw(2) << std::hex << (uint32_t)eventId);
+                        logUnprocessed();
                     }
                 }
-            }
-            else if (m_eventCallback != nullptr)
-            {
-                if (!m_eventCallback(p_ble_evt))
+                else
                 {
-                    NRF_LOG(role() << " Unprocessed event: 0x" << std::setfill('0') << std::setw(2) << std::hex << (uint32_t)eventId);
+                    logUnprocessed();
                 }
+            }
+            else
+            {
+                if (m_eventCallback != nullptr)
+                {
+                    if (!m_eventCallback(p_ble_evt))
+                    {
+                        logGenericUnprocessed();
+                    }
+                }
+                else
+                {
+                    logGenericUnprocessed();
+                }
+
             }
         }
 
@@ -452,25 +495,23 @@ namespace testutil
             // Setup scratchpad with default values
 #if NRF_SD_BLE_API <= 3
             std::memset(&scratchpad.ble_enable_params, 0, sizeof(scratchpad.ble_enable_params));
-#endif
 
-#if NRF_SD_BLE_API == 3
-            scratchpad.ble_enable_params.gatt_enable_params.att_mtu = GATT_MTU_SIZE_DEFAULT;
-#elif NRF_SD_BLE_API < 3
             scratchpad.ble_enable_params.gatts_enable_params.attr_tab_size = BLE_GATTS_ATTR_TAB_SIZE_DEFAULT;
             scratchpad.ble_enable_params.gatts_enable_params.service_changed = false;
             scratchpad.ble_enable_params.gap_enable_params.periph_conn_count = 1;
             scratchpad.ble_enable_params.gap_enable_params.central_conn_count = 1;
             scratchpad.ble_enable_params.gap_enable_params.central_sec_count = 1;
-            scratchpad.ble_enable_params.common_enable_params.p_conn_bw_counts = NULL;
+            scratchpad.ble_enable_params.common_enable_params.p_conn_bw_counts = nullptr;
             scratchpad.ble_enable_params.common_enable_params.vs_uuid_count = 1;
-#endif
 
-#if NRF_SD_BLE_API <= 3
             scratchpad.common_opt.conn_bw.role = BLE_GAP_ROLE_CENTRAL;
             scratchpad.common_opt.conn_bw.conn_bw.conn_bw_rx = BLE_CONN_BW_HIGH;
             scratchpad.common_opt.conn_bw.conn_bw.conn_bw_tx = BLE_CONN_BW_HIGH;
             scratchpad.opt.common_opt = scratchpad.common_opt;
+#endif
+
+#if NRF_SD_BLE_API == 3
+            scratchpad.ble_enable_params.gatt_enable_params.att_mtu = DEFAULT_MTU_SIZE;
 #endif
 
             // Connection parameters
@@ -485,6 +526,7 @@ namespace testutil
 #if NRF_SD_BLE_API == 2
             scratchpad.scan_param.p_whitelist = nullptr;
 #endif
+
 #if NRF_SD_BLE_API >= 3
             scratchpad.scan_param.use_whitelist = 0;
             scratchpad.scan_param.adv_dir_report = 0;
@@ -498,13 +540,13 @@ namespace testutil
             // Advertisement parameters
             memset(&scratchpad.adv_params, 0, sizeof(ble_gap_adv_params_t));
             scratchpad.adv_params.type = BLE_GAP_ADV_TYPE_ADV_IND;
-            scratchpad.adv_params.p_peer_addr = NULL;                        // Undirected advertisement.
+            scratchpad.adv_params.p_peer_addr = nullptr;                        // Undirected advertisement.
             scratchpad.adv_params.fp = BLE_GAP_ADV_FP_ANY;
             scratchpad.adv_params.interval = millisecondsToUnits(40, UNIT_0_625_MS);
             scratchpad.adv_params.timeout = 180; // 180 seconds
 
 #if NRF_SD_BLE_API == 2
-            scratchpad.adv_params.p_whitelist = NULL;
+            scratchpad.adv_params.p_whitelist = nullptr;
 #endif
         }
 
@@ -520,9 +562,14 @@ namespace testutil
         uint32_t initBLEStack()
         {
             uint32_t            err_code;
-            uint32_t *          app_ram_base = NULL;
+            uint32_t *          app_ram_base = nullptr;
 
 #if NRF_SD_BLE_API <= 3
+#if NRF_SD_BLE_API == 3
+            NRF_LOG(role() << "SoftDevice API version == 3 needs to set the MTU when enabling the SoftDevice.");
+            NRF_LOG(role() << "Using MTU value " << scratchpad.mtu << " from scratchpad and setting the same value in ble_enable_params.gatt_enable_params.att_mtu");
+            scratchpad.ble_enable_params.gatt_enable_params.att_mtu = scratchpad.mtu;
+#endif
             err_code = sd_ble_enable(m_adapter, &scratchpad.ble_enable_params, app_ram_base);
 #else
             err_code = sd_ble_enable(m_adapter, app_ram_base);

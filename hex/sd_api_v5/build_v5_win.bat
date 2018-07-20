@@ -14,8 +14,7 @@ REM Environment variables that is changed between SDK versions
 @SET SOFTDEVICE_MINOR=0
 @SET SOFTDEVICE_PATCH=0
 
-REM Environment variables that are below that are mostly based on the ones above
-REM Do not know why a shortened name is used
+REM Environment variables below are mostly based on the ones above
 @SET TEMP_NAME=s150
 @SET SOFTDEVICE_PATH="%rootpath%\sdk\%TEMP_NAME%\components\softdevice\s132v%SOFTDEVICE_MAJOR%\hex\s132_nrf52_%SOFTDEVICE_MAJOR%.%SOFTDEVICE_MINOR%.%SOFTDEVICE_PATCH%_softdevice.hex"
 @SET MERGED_HEX_FILENAME_PCA10040_1m="%rootpath%\sdk\connectivity_%CONN_VERSION%_1m_with_s132_%SOFTDEVICE_MAJOR%.%SOFTDEVICE_MINOR%.hex"
@@ -32,6 +31,7 @@ REM Do not know why a shortened name is used
 cd "%scriptpath%" || GOTO :error
 "c:\program files\git\bin\bash.exe" bootstrap_sd_api_v%SOFTDEVICE_MAJOR%.sh || GOTO :error
 
+REM Do not know why a shortened name is used
 @ECHO Workaround to reduce path length before build
 cd %rootpath%\sdk || GOTO :error
 rename %SDK_NAME% %TEMP_NAME% || GOTO :error
@@ -76,7 +76,7 @@ REM Warnings are expected, UV return codes: http://www.keil.com/support/man/docs
 @if %ERRORLEVEL% GTR 1 GOTO :error
 
 @ECHO Merge hex SoftDevice and application.
-%MERGE_HEX% -m _build\nrf52832_xxaa.hex %SOFTDEVICE_PATH% -o %MERGED_HEX_FILENAME_PCA10059_usb% || GOTO :error
+%MERGE_HEX% -m _build\nrf52840_xxaa.hex %SOFTDEVICE_PATH% -o %MERGED_HEX_FILENAME_PCA10059_usb% || GOTO :error
 
 :summary
 @ECHO.

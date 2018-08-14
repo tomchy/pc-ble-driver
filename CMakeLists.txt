@@ -3,6 +3,9 @@ project(pc-ble-driver)
 
 include (cmake/pc-ble-driver.cmake)
 
+include(${CMAKE_BINARY_DIR}/conanbuildinfo.cmake)
+conan_basic_setup(TARGETS)
+
 # Common source files
 file(GLOB LIB_BASE_C_SRC_FILES "src/common/*.c")
 file(GLOB LIB_BASE_CPP_SRC_FILES "src/common/*.cpp")
@@ -70,6 +73,7 @@ endif()
 add_definitions(
     -DSD_RPC_EXPORTS
     -DHCI_LINK_CONTROL # Adds support for Link Control packets according to the HCI standard
+    -DASIO_STANDALONE
 )
 
 # Add libraries
@@ -92,7 +96,7 @@ include_directories(
         include/common/internal
         include/common/internal/transport
         # Include boost as a system include so that the compiler doesn't nag about issues in boost header files
-        SYSTEM ${Boost_INCLUDE_DIRS}
+        SYSTEM ${CONAN_INCLUDE_DIRS_ASIO}
 )
 
 # Set per-SD API version include directories and compiler definitions
@@ -132,8 +136,8 @@ foreach(SD_API_VER ${SD_API_VERS})
     endif()
 
     # Specify libraries to link serialization library with
-    target_link_libraries (${PC_BLE_DRIVER_${SD_API_VER}_SHARED_LIB} PRIVATE ${Boost_LIBRARIES})
-    target_link_libraries (${PC_BLE_DRIVER_${SD_API_VER}_STATIC_LIB} PRIVATE ${Boost_LIBRARIES})
+    target_link_libraries (${PC_BLE_DRIVER_${SD_API_VER}_SHARED_LIB} PRIVATE CONAN_PKG::asio)
+    target_link_libraries (${PC_BLE_DRIVER_${SD_API_VER}_STATIC_LIB} PRIVATE CONAN_PKG::asio)
 endforeach(SD_API_VER)
 
 # Add tests
